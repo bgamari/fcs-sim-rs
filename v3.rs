@@ -1,16 +1,21 @@
+extern crate std;
 use std::f64;
 use std::ops;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-struct V3<T> { x: T, y: T, z: T }
+pub struct V3<T> {
+    pub x: T,
+    pub y: T,
+    pub z: T
+}
 
 impl<T> V3<T> {
-    fn origin() -> V3<T> where T: Scalar {
+    pub fn origin() -> V3<T> where T: Scalar {
         V3 { x: Scalar::zero(), y: Scalar::zero(), z: Scalar::zero() }
     }
 }
 
-trait Scalar {
+pub trait Scalar {
     fn zero() -> Self;
 }
 
