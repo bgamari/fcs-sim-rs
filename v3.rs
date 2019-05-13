@@ -1,8 +1,9 @@
 extern crate std;
+
 use std::f64;
 use std::ops;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct V3<T> {
     pub x: T,
     pub y: T,
@@ -49,6 +50,17 @@ impl<T: Copy + ops::Mul<Output=T>> ops::Mul<T> for V3<T> {
             x: self.x * rhs,
             y: self.y * rhs,
             z: self.z * rhs,
+        }
+    }
+}
+
+impl<T: Copy + ops::Div<Output=T>> ops::Div<T> for V3<T> {
+    type Output = V3<T>;
+    fn div(self, rhs: T) -> V3<T> {
+        V3 {
+            x: self.x / rhs,
+            y: self.y / rhs,
+            z: self.z / rhs,
         }
     }
 }

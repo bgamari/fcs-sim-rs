@@ -2,6 +2,10 @@ extern crate rand;
 extern crate nalgebra as na;
 extern crate num_traits;
 extern crate rayon;
+extern crate csv;
+#[macro_use]
+extern crate serde_derive;
+
 mod v3;
 
 use rand::distributions::{Distribution};
@@ -11,7 +15,7 @@ use num_traits::Num;
 
 struct RandomWalk<'a, Rng> {
     rng: &'a mut Rng,
-    diffusivity: f64, /// in units of length^2 / step
+    sigma: f64, /// MSD per step
     pos: V3<f64>
 }
 
@@ -19,7 +23,7 @@ impl<'a, Rng: rand::Rng> std::iter::Iterator for RandomWalk<'a, Rng> {
     type Item = V3<f64>;
     fn next(&mut self) -> Option<V3<f64>> {
         use rand::distributions::Normal;
-        let r = Normal::new(0.0, self.diffusivity).sample(&mut self.rng);
+        let r = Normal::new(0.0, self.sigma).sample(&mut self.rng);
         self.pos = self.pos + OnSphere.sample(&mut self.rng) * r;
         Some(self.pos)
     }
@@ -43,47 +47,49 @@ impl Distribution<V3<f64>> for OnSphere {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct Box {
-    box_size: V3<f64>
+    half_box_size: V3<f64>
 }
 
 impl Box {
-    fn contains(&self, p: &V3<f64>) -> bool {
-        let s = self.box_size;
-        p.x >= 0.0 && p.x < s.x
-            && p.y >= 0.0 && p.y < s.y
-            && p.z >= 0.0 && p.z < s.z
+    fn new(box_size: V3<f64>) -> Box {
+        Box {
+            half_box_size: box_size / 2.0
+        }
     }
-}
 
-struct PointInBox(Box);
+    fn contains(&self, p: &V3<f64>) -> bool {
+        let s = self.half_box_size;
+        p.x.abs() < s.x 
+            && p.y.abs() < s.y
+            && p.z.abs() < s.z
+    }
 
-impl Distribution<V3<f64>> for PointInBox {
-    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> V3<f64> {
+    fn sample_point<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> V3<f64> {
         use rand::distributions::Uniform;
-        let PointInBox(b) = self;
+        let s = self.half_box_size;
         V3 {
-            x: rng.sample(Uniform::new(0.0, b.box_size.x)),
-            y: rng.sample(Uniform::new(0.0, b.box_size.y)),
-            z: rng.sample(Uniform::new(0.0, b.box_size.z)),
+            x: rng.sample(Uniform::new(-s.x, s.x)),
+            y: rng.sample(Uniform::new(-s.y, s.y)),
+            z: rng.sample(Uniform::new(-s.y, s.z)),
         }
     }
 }
 
 struct WalkThroughBox {
     sim_box: Box,
-    diffusivity: f64
+    sigma: f64
 }
 
 impl WalkThroughBox {
     fn sample<R: rand::Rng + Sized>(&self, rng: &mut R) -> Vec<V3<f64>> {
         let b = &self.sim_box;
-        let p0 = rng.sample(PointInBox(*b));
+        let p0 = b.sample_point(rng);
         let walk0: Vec<V3<f64>> = { 
-            let walk = RandomWalk { rng: rng, diffusivity: self.diffusivity, pos: p0 };
+            let walk = RandomWalk { rng: rng, sigma: self.sigma, pos: p0 };
             walk.take_while(|p| b.contains(p)).collect()
         };
         let walk1: Vec<V3<f64>> = { 
-            let walk = RandomWalk { rng: rng, diffusivity: self.diffusivity, pos: p0 };
+            let walk = RandomWalk { rng: rng, sigma: self.sigma, pos: p0 };
             walk.take_while(|p| b.contains(p)).collect()
         };
         walk0.into_iter().rev().chain(walk1.into_iter()).collect()
@@ -92,10 +98,10 @@ impl WalkThroughBox {
 
 fn beam_intensity(beam_size: V3<f64>, p: V3<f64>) -> f64 {
     let alpha: f64 =
-          beam_size.x.powi(2) / p.x.powi(2)
-        + beam_size.y.powi(2) / p.y.powi(2)
-        + beam_size.z.powi(2) / p.z.powi(2);
-    (-alpha / 2.0).exp()
+          p.x.powi(2) / beam_size.x.powi(2)
+        + p.y.powi(2) / beam_size.y.powi(2)
+        + p.z.powi(2) / beam_size.z.powi(2);
+    (-2.0 * alpha).exp()
 }
 
 fn log_space(min: f64, max: f64, n: usize) -> Vec<f64> {
@@ -112,14 +118,14 @@ fn log_space(min: f64, max: f64, n: usize) -> Vec<f64> {
     }).collect()
 }
 
-fn write_vec<T>(path: &std::path::Path, v: &Vec<T>) -> std::io::Result<()> where
-    T: std::fmt::Display
+fn write_vec<'a, T>(path: &std::path::Path, v: &'a Vec<T>) -> std::io::Result<()> where
+    T: serde::Serialize
 {
-    use std::io::prelude::*;
-    let mut file = std::fs::File::create(path)?;
-    v.iter().try_for_each(|x| {
-        write!(file, "{}\n", x)
-    })?;
+    let mut wtr = csv::WriterBuilder::new()
+        .delimiter(b'\t')
+        .from_path(path)?;
+
+    v.iter().try_for_each(|x| wtr.serialize(x))?;
     Ok(())
 }
 
@@ -129,14 +135,15 @@ fn main() {
     use rayon::prelude::*;
     use num_traits::real::Real;
 
-    let diffusivity = 1.1e-3; // nm^2 / ns
-    let beam_size = V3 {x:1.0, y:1.0, z:10.0};
-    let sim_box = Box {box_size: beam_size * 20.0};
+    let diffusivity = 0.122; // nm^2 / ns
+    let beam_size = V3 {x: 200.0, y: 200.0, z: 1000.0}; // nm
+    let sim_box = Box::new(beam_size * 20.0);
     let step_t: f64 = 10e-9; // seconds
-    let n_steps: u64 = (10e-3 / step_t) as u64;
+    let n_steps: u64 = (100e-3 / step_t) as u64;
     let sample_idxs: Vec<_> = (0..1).collect();
     let max_tau: u64 = (10e-3 / step_t) as u64;
     let n_taus: u64 = 1000;
+    let sigma = Real::sqrt(6.0 * diffusivity * step_t / 1e-9);
 
     let tau_ts: Vec<f64> = log_space(step_t as f64, max_tau as f64, n_taus as usize);
     let taus: Vec<usize> =
@@ -144,22 +151,23 @@ fn main() {
         .iter()
         .map(|x| Real::round(*x) as usize)
         .collect();
-    println!("taus: {:?}\n", tau_ts);
+    //println!("taus: {:?}\n", tau_ts);
 
     let results: Vec<Vec<f64>> = sample_idxs.par_iter().map(move |_i| {
           let mut rng = rand::rngs::SmallRng::from_entropy();
           let walk = WalkThroughBox {
               sim_box: sim_box,
-              diffusivity: diffusivity * step_t / 1e-9
+              sigma: sigma
           };
+          write_vec(std::path::Path::new("traj.txt"), &walk.sample(&mut rng)).unwrap();
           let steps: Vec<f64> = 
               walk
               .sample(&mut rng)
               .into_iter()
               .map(|x| beam_intensity(beam_size, x))
-              .take(n_steps as usize)
+              // .take(n_steps as usize)
               .collect();
-          //write_vec(std::path::Path::new("out.txt"), &steps).unwrap();
+          write_vec(std::path::Path::new("out.txt"), &steps).unwrap();
           let corrs: Vec<f64> =
               taus
               .par_iter()
