@@ -61,7 +61,7 @@ impl Box {
 
     fn contains(&self, p: &V3<f64>) -> bool {
         let s = self.half_box_size;
-        p.x.abs() < s.x 
+        p.x.abs() < s.x
             && p.y.abs() < s.y
             && p.z.abs() < s.z
     }
@@ -86,11 +86,11 @@ impl WalkThroughBox {
     fn sample<R: rand::Rng + Sized>(&self, rng: &mut R) -> Vec<V3<f64>> {
         let b = &self.sim_box;
         let p0 = b.sample_point(rng);
-        let walk0: Vec<V3<f64>> = { 
+        let walk0: Vec<V3<f64>> = {
             let walk = RandomWalk { rng: rng, sigma: self.sigma, pos: p0 };
             walk.take_while(|p| b.contains(p)).collect()
         };
-        let walk1: Vec<V3<f64>> = { 
+        let walk1: Vec<V3<f64>> = {
             let walk = RandomWalk { rng: rng, sigma: self.sigma, pos: p0 };
             walk.take_while(|p| b.contains(p)).collect()
         };
@@ -163,7 +163,7 @@ fn main() {
               sigma: sigma
           };
           write_vec(std::path::Path::new("traj.txt"), &walk.sample(&mut rng)).unwrap();
-          let steps: Vec<LogFloat<f64>> = 
+          let steps: Vec<LogFloat<f64>> =
               walk
               .sample(&mut rng)
               .into_iter()
@@ -216,7 +216,7 @@ fn mean_log<T>(vec: &Vec<LogFloat<T>>) -> LogFloat<T> where
 fn correlate_log<T>(max_tau: usize, tau: usize, vec: &Vec<LogFloat<T>>) -> LogFloat<T> where
     T: num_traits::Float + std::iter::Sum
 {
-    let dot: Vec<LogFloat<T>> = 
+    let dot: Vec<LogFloat<T>> =
         vec
         .iter()
         .take(vec.len() - max_tau)
