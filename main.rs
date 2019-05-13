@@ -51,6 +51,8 @@ fn beam_intensity(beam_size: V3<f64>, p: V3<f64>) -> f64 {
 
 fn log_space(min: f64, max: f64, n: usize) -> Vec<f64> {
     use num_traits::real::Real;
+    assert!(min > 0.0);
+    assert!(max > 0.0);
     let a: f64 = Real::ln(min);
     let b: f64 = Real::ln(max);
     let nn: f64 = n as f64;
@@ -68,7 +70,7 @@ fn write_vec<T>(path: &std::path::Path, v: &Vec<T>) -> std::io::Result<()> where
     let mut file = std::fs::File::create(path)?;
     v.iter().try_for_each(|x| {
         write!(file, "{}\n", x)
-    });
+    })?;
     Ok(())
 }
 
@@ -80,28 +82,32 @@ fn main() {
 
     let beam_size = V3 {x:1.0, y:1.0, z:10.0};
     let step_t = 1; // nanoseconds
-    let n_steps: u64 = 1_000_000_000;
-    let xs: Vec<_> = (0..128).collect();
-    let max_tau: u64 = 100000;
-    let n_taus: u64 = 1000;
+    let n_steps: u64 = 100_000_000;
+    let sample_idxs: Vec<_> = (0..2).collect();
+    let max_tau: u64 = 100_000;
+    let n_taus: u64 = 1_000;
 
+    let tau_ts: Vec<f64> = log_space(step_t as f64, max_tau as f64, n_taus as usize);
     let taus: Vec<usize> =
-        log_space(0.0, max_tau as f64, n_taus as usize)
+        tau_ts
         .iter()
         .map(|x| Real::round(*x) as usize)
         .collect();
+    println!("taus: {:?}\n", tau_ts);
 
-    let results: Vec<Vec<f64>> = xs.par_iter().map(move |_i| {
+    let results: Vec<Vec<f64>> = sample_idxs.par_iter().map(move |_i| {
           let rng = rand::rngs::SmallRng::from_entropy();
           let walk = RandomWalk {
-              rng: rng, diffusivity: 1.0, pos: V3::origin()
+              rng: rng,
+              diffusivity: 1.1e-3,
+              pos: V3::origin()
           };
           let steps: Vec<f64> = 
               walk
               .map(|x| beam_intensity(beam_size, x))
               .take(n_steps as usize)
               .collect();
-          write_vec(std::path::Path::new("out.txt"), &steps).unwrap();
+          //write_vec(std::path::Path::new("out.txt"), &steps).unwrap();
           let corrs: Vec<f64> =
               taus
               .par_iter()
@@ -110,6 +116,12 @@ fn main() {
           corrs
     }).collect();
     println!("hello {:?}", results);
+
+    results.iter().enumerate().try_for_each(|(i, corrs)| {
+        let fname = format!("corr-{}", i);
+        let path = std::path::Path::new(&fname);
+        write_vec(path, corrs)
+    }).unwrap();
 }
 
 fn mean<N, T>(iter: T) -> N where
