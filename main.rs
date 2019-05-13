@@ -7,11 +7,13 @@ extern crate csv;
 extern crate serde_derive;
 
 mod v3;
+mod log_float;
 
 use rand::distributions::{Distribution};
 use std::f64;
 use v3::V3;
 use num_traits::Num;
+use log_float::LogFloat;
 
 struct RandomWalk<'a, Rng> {
     rng: &'a mut Rng,
@@ -194,5 +196,31 @@ fn mean<N, T>(iter: T) -> N where
 }
 
 fn correlate(max_tau: usize, tau: usize, vec: &Vec<f64>) -> f64 {
-    mean(vec.iter().take(vec.len() - max_tau).zip(vec.iter().skip(tau)).map(|(x,y)| x*y))
+    let dot =
+        vec
+        .iter()
+        .take(vec.len() - max_tau)
+        .zip(vec.iter().skip(tau))
+        .map(|(x,y)| x * y);
+    mean(dot)
+}
+
+fn mean_log<T>(vec: &Vec<LogFloat<T>>) -> LogFloat<T> where
+    T: std::iter::Sum + num_traits::Float + std::cmp::PartialOrd
+{
+    let n: LogFloat<T> = LogFloat::from_value(T::from(vec.len()).unwrap());
+    LogFloat::sum(vec) / n
+}
+
+fn correlate_log<T>(max_tau: usize, tau: usize, vec: &Vec<LogFloat<T>>) -> LogFloat<T> where
+    T: num_traits::Float + std::iter::Sum
+{
+    let dot: Vec<LogFloat<T>> = 
+        vec
+        .iter()
+        .take(vec.len() - max_tau)
+        .zip(vec.iter().skip(tau))
+        .map(|(x,y)| *x * *y)
+        .collect();
+    mean_log(&dot)
 }
