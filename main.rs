@@ -61,12 +61,22 @@ fn log_space(min: f64, max: f64, n: usize) -> Vec<f64> {
     }).collect()
 }
 
+fn write_vec<T>(path: &std::path::Path, v: &Vec<T>) -> std::io::Result<()> where
+    T: std::fmt::Display
+{
+    use std::io::prelude::*;
+    let mut file = std::fs::File::create(path)?;
+    v.iter().try_for_each(|x| {
+        write!(file, "{}\n", x)
+    });
+    Ok(())
+}
+
 fn main() {
     use std::vec::Vec;
     use rand::FromEntropy;
     use rayon::prelude::*;
     use num_traits::real::Real;
-    use std::convert::From;
 
     let beam_size = V3 {x:1.0, y:1.0, z:10.0};
     let step_t = 1; // nanoseconds
@@ -91,6 +101,7 @@ fn main() {
               .map(|x| beam_intensity(beam_size, x))
               .take(n_steps as usize)
               .collect();
+          write_vec(std::path::Path::new("out.txt"), &steps).unwrap();
           let corrs: Vec<f64> =
               taus
               .par_iter()
