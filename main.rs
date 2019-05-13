@@ -49,24 +49,56 @@ fn beam_intensity(beam_size: V3<f64>, p: V3<f64>) -> f64 {
     (-alpha / 2.0).exp()
 }
 
+fn log_space(min: f64, max: f64, n: usize) -> Vec<f64> {
+    use num_traits::real::Real;
+    let a: f64 = Real::ln(min);
+    let b: f64 = Real::ln(max);
+    let nn: f64 = n as f64;
+    let dx: f64 = (b - a) / nn;
+    (0..n).map(|i| {
+        let ii = i as f64;
+        Real::exp(a + ii * dx)
+    }).collect()
+}
+
 fn main() {
     use std::vec::Vec;
     use rand::FromEntropy;
     use rayon::prelude::*;
+    use num_traits::real::Real;
+    use std::convert::From;
+
     let beam_size = V3 {x:1.0, y:1.0, z:10.0};
+    let step_t = 1; // nanoseconds
+    let n_steps: u64 = 1_000_000_000;
     let xs: Vec<_> = (0..128).collect();
-    let results: Vec<f64> = xs.par_iter().map(|_i| {
+    let max_tau: u64 = 100000;
+    let n_taus: u64 = 1000;
+
+    let taus: Vec<usize> =
+        log_space(0.0, max_tau as f64, n_taus as usize)
+        .iter()
+        .map(|x| Real::round(*x) as usize)
+        .collect();
+
+    let results: Vec<Vec<f64>> = xs.par_iter().map(move |_i| {
           let rng = rand::rngs::SmallRng::from_entropy();
           let walk = RandomWalk {
               rng: rng, diffusivity: 1.0, pos: V3::origin()
           };
-          let steps: Vec<f64> = walk.map(|x| beam_intensity(beam_size, x)).take(10000000).collect();
-          //let steps: Vec<V3<f64>> = walk.map(|x| beam_intensity(beam_size, x)).take(10000000).collect();
-          correlate(100, 32, steps)
+          let steps: Vec<f64> = 
+              walk
+              .map(|x| beam_intensity(beam_size, x))
+              .take(n_steps as usize)
+              .collect();
+          let corrs: Vec<f64> =
+              taus
+              .par_iter()
+              .map(|tau| correlate(max_tau as usize, *tau, &steps))
+              .collect();
+          corrs
     }).collect();
     println!("hello {:?}", results);
-
-    //debug!("Hello {}", steps);
 }
 
 fn mean<N, T>(iter: T) -> N where
@@ -78,6 +110,6 @@ fn mean<N, T>(iter: T) -> N where
     accum / From::from(count)
 }
 
-fn correlate(max_tau: usize, tau: usize, vec: Vec<f64>) -> f64 {
+fn correlate(max_tau: usize, tau: usize, vec: &Vec<f64>) -> f64 {
     mean(vec.iter().take(vec.len() - max_tau).zip(vec.iter().skip(tau)).map(|(x,y)| x*y))
 }
