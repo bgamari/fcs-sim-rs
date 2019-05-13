@@ -162,7 +162,7 @@ fn main() {
               sim_box: sim_box,
               sigma: sigma
           };
-          write_vec(std::path::Path::new("traj.txt"), &walk.sample(&mut rng)).unwrap();
+          //write_vec(std::path::Path::new("traj.txt"), &walk.sample(&mut rng)).unwrap();
           let steps: Vec<LogFloat<f64>> =
               walk
               .sample(&mut rng)
@@ -170,7 +170,7 @@ fn main() {
               .map(|x| beam_intensity(beam_size, x))
               // .take(n_steps as usize)
               .collect();
-          write_vec(std::path::Path::new("out.txt"), &steps).unwrap();
+          //write_vec(std::path::Path::new("out.txt"), &steps).unwrap();
           let padded_steps: Vec<LogFloat<f64>> = pad_to_length(2*max_tau as usize, LogFloat::from_value(0.0), steps);
           let corrs: Vec<LogFloat<f64>> =
               taus
