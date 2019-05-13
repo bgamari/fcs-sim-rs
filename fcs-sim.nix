@@ -5,5 +5,5 @@ buildRustPackage rec {
   version = "0.1.0";
 
   src = ./.;
-  cargoSha256 = "1mayyq0vsaamzcyymgnf9jwk5pr73ik46ffw8id0r0f2v4kzpqbs";
+  cargoSha256 = "1syqc2ccx1vf7pcjy9yi9bww8s5111vp7d21nffjsgz9yi5qsrxh";
 }

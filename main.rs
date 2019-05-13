@@ -11,7 +11,7 @@ use num_traits::Num;
 
 struct RandomWalk<'a, Rng> {
     rng: &'a mut Rng,
-    diffusivity: f64,
+    diffusivity: f64, /// in units of length^2 / step
     pos: V3<f64>
 }
 
@@ -129,13 +129,13 @@ fn main() {
     use rayon::prelude::*;
     use num_traits::real::Real;
 
-    let diffusivity = 1.1e-3;
+    let diffusivity = 1.1e-3; // nm^2 / ns
     let beam_size = V3 {x:1.0, y:1.0, z:10.0};
-    let sim_box = Box {box_size: beam_size * 50.0};
-    let step_t: f64 = 1e-9; // nanoseconds
-    let n_steps: u64 = (1e-1 / step_t) as u64;
-    let sample_idxs: Vec<_> = (0..2).collect();
-    let max_tau: u64 = (100e-3 / step_t) as u64;
+    let sim_box = Box {box_size: beam_size * 20.0};
+    let step_t: f64 = 10e-9; // seconds
+    let n_steps: u64 = (10e-3 / step_t) as u64;
+    let sample_idxs: Vec<_> = (0..1).collect();
+    let max_tau: u64 = (10e-3 / step_t) as u64;
     let n_taus: u64 = 1000;
 
     let tau_ts: Vec<f64> = log_space(step_t as f64, max_tau as f64, n_taus as usize);
@@ -150,7 +150,7 @@ fn main() {
           let mut rng = rand::rngs::SmallRng::from_entropy();
           let walk = WalkThroughBox {
               sim_box: sim_box,
-              diffusivity: diffusivity
+              diffusivity: diffusivity * step_t / 1e-9
           };
           let steps: Vec<f64> = 
               walk
