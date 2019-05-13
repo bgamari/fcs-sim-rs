@@ -98,12 +98,13 @@ impl WalkThroughBox {
     }
 }
 
-fn beam_intensity(beam_size: V3<f64>, p: V3<f64>) -> f64 {
+fn beam_intensity(beam_size: V3<f64>, p: V3<f64>) -> LogFloat<f64> {
     let alpha: f64 =
           p.x.powi(2) / beam_size.x.powi(2)
         + p.y.powi(2) / beam_size.y.powi(2)
         + p.z.powi(2) / beam_size.z.powi(2);
-    (-2.0 * alpha).exp()
+    //(-2.0 * alpha).exp()
+    LogFloat::from_ln(-2.0 * alpha)
 }
 
 fn log_space(min: f64, max: f64, n: usize) -> Vec<f64> {
@@ -155,14 +156,14 @@ fn main() {
         .collect();
     //println!("taus: {:?}\n", tau_ts);
 
-    let results: Vec<Vec<f64>> = sample_idxs.par_iter().map(move |_i| {
+    let results: Vec<Vec<LogFloat<f64>>> = sample_idxs.par_iter().map(move |_i| {
           let mut rng = rand::rngs::SmallRng::from_entropy();
           let walk = WalkThroughBox {
               sim_box: sim_box,
               sigma: sigma
           };
           write_vec(std::path::Path::new("traj.txt"), &walk.sample(&mut rng)).unwrap();
-          let steps: Vec<f64> = 
+          let steps: Vec<LogFloat<f64>> = 
               walk
               .sample(&mut rng)
               .into_iter()
@@ -170,10 +171,10 @@ fn main() {
               // .take(n_steps as usize)
               .collect();
           write_vec(std::path::Path::new("out.txt"), &steps).unwrap();
-          let corrs: Vec<f64> =
+          let corrs: Vec<LogFloat<f64>> =
               taus
               .par_iter()
-              .map(|tau| correlate(max_tau as usize, *tau, &steps))
+              .map(|tau| correlate_log(max_tau as usize, *tau, &steps))
               .collect();
           corrs
     }).collect();
