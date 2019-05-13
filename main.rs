@@ -9,13 +9,13 @@ use std::f64;
 use v3::V3;
 use num_traits::Num;
 
-struct RandomWalk<Rng> {
-    rng: Rng,
+struct RandomWalk<'a, Rng> {
+    rng: &'a mut Rng,
     diffusivity: f64,
     pos: V3<f64>
 }
 
-impl<Rng: rand::Rng> std::iter::Iterator for RandomWalk<Rng> {
+impl<'a, Rng: rand::Rng> std::iter::Iterator for RandomWalk<'a, Rng> {
     type Item = V3<f64>;
     fn next(&mut self) -> Option<V3<f64>> {
         use rand::distributions::Normal;
@@ -38,6 +38,55 @@ impl Distribution<V3<f64>> for OnSphere {
             y: theta.sin() * phi.sin(),
             z: theta.cos()
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Box {
+    box_size: V3<f64>
+}
+
+impl Box {
+    fn contains(&self, p: &V3<f64>) -> bool {
+        let s = self.box_size;
+        p.x >= 0.0 && p.x < s.x
+            && p.y >= 0.0 && p.y < s.y
+            && p.z >= 0.0 && p.z < s.z
+    }
+}
+
+struct PointInBox(Box);
+
+impl Distribution<V3<f64>> for PointInBox {
+    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> V3<f64> {
+        use rand::distributions::Uniform;
+        let PointInBox(b) = self;
+        V3 {
+            x: rng.sample(Uniform::new(0.0, b.box_size.x)),
+            y: rng.sample(Uniform::new(0.0, b.box_size.y)),
+            z: rng.sample(Uniform::new(0.0, b.box_size.z)),
+        }
+    }
+}
+
+struct WalkThroughBox {
+    sim_box: Box,
+    diffusivity: f64
+}
+
+impl WalkThroughBox {
+    fn sample<R: rand::Rng + Sized>(&self, rng: &mut R) -> Vec<V3<f64>> {
+        let b = &self.sim_box;
+        let p0 = rng.sample(PointInBox(*b));
+        let walk0: Vec<V3<f64>> = { 
+            let walk = RandomWalk { rng: rng, diffusivity: self.diffusivity, pos: p0 };
+            walk.take_while(|p| b.contains(p)).collect()
+        };
+        let walk1: Vec<V3<f64>> = { 
+            let walk = RandomWalk { rng: rng, diffusivity: self.diffusivity, pos: p0 };
+            walk.take_while(|p| b.contains(p)).collect()
+        };
+        walk0.into_iter().rev().chain(walk1.into_iter()).collect()
     }
 }
 
@@ -80,12 +129,14 @@ fn main() {
     use rayon::prelude::*;
     use num_traits::real::Real;
 
+    let diffusivity = 1.1e-3;
     let beam_size = V3 {x:1.0, y:1.0, z:10.0};
-    let step_t = 1; // nanoseconds
-    let n_steps: u64 = 100_000_000;
+    let sim_box = Box {box_size: beam_size * 50.0};
+    let step_t: f64 = 1e-9; // nanoseconds
+    let n_steps: u64 = (1e-1 / step_t) as u64;
     let sample_idxs: Vec<_> = (0..2).collect();
-    let max_tau: u64 = 100_000;
-    let n_taus: u64 = 1_000;
+    let max_tau: u64 = (100e-3 / step_t) as u64;
+    let n_taus: u64 = 1000;
 
     let tau_ts: Vec<f64> = log_space(step_t as f64, max_tau as f64, n_taus as usize);
     let taus: Vec<usize> =
@@ -96,14 +147,15 @@ fn main() {
     println!("taus: {:?}\n", tau_ts);
 
     let results: Vec<Vec<f64>> = sample_idxs.par_iter().map(move |_i| {
-          let rng = rand::rngs::SmallRng::from_entropy();
-          let walk = RandomWalk {
-              rng: rng,
-              diffusivity: 1.1e-3,
-              pos: V3::origin()
+          let mut rng = rand::rngs::SmallRng::from_entropy();
+          let walk = WalkThroughBox {
+              sim_box: sim_box,
+              diffusivity: diffusivity
           };
           let steps: Vec<f64> = 
               walk
+              .sample(&mut rng)
+              .into_iter()
               .map(|x| beam_intensity(beam_size, x))
               .take(n_steps as usize)
               .collect();
