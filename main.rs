@@ -156,7 +156,7 @@ fn main() {
         .collect();
     //println!("taus: {:?}\n", tau_ts);
 
-    let results: Vec<Vec<LogFloat<f64>>> = sample_idxs.par_iter().map(move |_i| {
+    let results: Vec<Vec<LogFloat<f64>>> = sample_idxs.par_iter().map(move |i| {
           let mut rng = rand::rngs::SmallRng::from_entropy();
           let walk = WalkThroughBox {
               sim_box: sim_box,
@@ -177,9 +177,9 @@ fn main() {
               .par_iter()
               .map(|tau| correlate_log(max_tau as usize, *tau, &padded_steps))
               .collect();
+          println!("{} done", i);
           corrs
     }).collect();
-    println!("hello {:?}", results);
 
     results.iter().enumerate().try_for_each(|(i, corrs)| {
         let fname = format!("corr-{}", i);
