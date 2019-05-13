@@ -141,7 +141,7 @@ fn main() {
     let diffusivity = 0.122; // nm^2 / ns
     let beam_size = V3 {x: 200.0, y: 200.0, z: 1000.0}; // nm
     let sim_box = Box::new(beam_size * 30.0);
-    let step_t: f64 = 2e-9; // seconds
+    let step_t: f64 = 10e-9; // seconds
     let n_steps: u64 = (100e-3 / step_t) as u64;
     let sample_idxs: Vec<_> = (0..128).collect();
     let max_tau: u64 = (10e-3 / step_t) as u64;
