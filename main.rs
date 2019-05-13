@@ -140,10 +140,10 @@ fn main() {
 
     let diffusivity = 0.122; // nm^2 / ns
     let beam_size = V3 {x: 200.0, y: 200.0, z: 1000.0}; // nm
-    let sim_box = Box::new(beam_size * 20.0);
-    let step_t: f64 = 10e-9; // seconds
+    let sim_box = Box::new(beam_size * 30.0);
+    let step_t: f64 = 2e-9; // seconds
     let n_steps: u64 = (100e-3 / step_t) as u64;
-    let sample_idxs: Vec<_> = (0..1).collect();
+    let sample_idxs: Vec<_> = (0..128).collect();
     let max_tau: u64 = (10e-3 / step_t) as u64;
     let n_taus: u64 = 1000;
     let sigma = Real::sqrt(6.0 * diffusivity * step_t / 1e-9);
@@ -171,10 +171,11 @@ fn main() {
               // .take(n_steps as usize)
               .collect();
           write_vec(std::path::Path::new("out.txt"), &steps).unwrap();
+          let padded_steps: Vec<LogFloat<f64>> = pad_to_length(2*max_tau as usize, LogFloat::from_value(0.0), steps);
           let corrs: Vec<LogFloat<f64>> =
               taus
               .par_iter()
-              .map(|tau| correlate_log(max_tau as usize, *tau, &steps))
+              .map(|tau| correlate_log(max_tau as usize, *tau, &padded_steps))
               .collect();
           corrs
     }).collect();
@@ -187,6 +188,15 @@ fn main() {
     }).unwrap();
 }
 
+fn pad_to_length<T: Clone>(length: usize, pad: T, mut vec: Vec<T>) -> Vec<T> {
+    if vec.len() < length {
+        let mut padding = Vec::new();
+        padding.resize(length - vec.len(), pad);
+        vec.append(&mut padding)
+    }
+    vec
+}
+
 fn mean<N, T>(iter: T) -> N where
     N: Num + std::convert::From<u32>,
     T: Iterator<Item=N>
@@ -197,6 +207,7 @@ fn mean<N, T>(iter: T) -> N where
 }
 
 fn correlate(max_tau: usize, tau: usize, vec: &Vec<f64>) -> f64 {
+    assert!(vec.len() >= max_tau);
     let dot =
         vec
         .iter()
@@ -209,13 +220,14 @@ fn correlate(max_tau: usize, tau: usize, vec: &Vec<f64>) -> f64 {
 fn mean_log<T>(vec: &Vec<LogFloat<T>>) -> LogFloat<T> where
     T: std::iter::Sum + num_traits::Float + std::cmp::PartialOrd
 {
-    let n: LogFloat<T> = LogFloat::from_value(T::from(vec.len()).unwrap());
+    let n: LogFloat<T> = LogFloat::from_value(T::from(vec.len()).expect("mean_log: n too large"));
     LogFloat::sum(vec) / n
 }
 
 fn correlate_log<T>(max_tau: usize, tau: usize, vec: &Vec<LogFloat<T>>) -> LogFloat<T> where
     T: num_traits::Float + std::iter::Sum
 {
+    assert!(vec.len() >= max_tau);
     let dot: Vec<LogFloat<T>> =
         vec
         .iter()

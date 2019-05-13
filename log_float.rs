@@ -13,6 +13,10 @@ impl<T: Copy + num_traits::Float> LogFloat<T> {
         LogFloat(n)
     }
 
+    pub fn zero() -> LogFloat<T> {
+        LogFloat(num_traits::Float::neg_infinity())
+    }
+
     pub fn exp(&self) -> T {
         let LogFloat(n) = self;
         *n
@@ -24,14 +28,14 @@ impl<T: Copy + num_traits::Float> LogFloat<T> {
         use std::cmp::Ordering;
         let x0: T = *v.iter().fold(None, |acc, LogFloat(x)| {
             match acc {
-                Some(y) => 
+                Some(y) =>
                     match x.partial_cmp(y) {
                         Some(Ordering::Greater) => Some(x),
                         _ => Some(y)
                     },
                 None => Some(x)
             }
-        }).unwrap();
+        }).expect("LogFloat::sum: No maximum");
         let sum: T = v.iter().map(|LogFloat(x)| Real::exp_m1(*x - x0)).sum();
         let n: T = T::from(v.len()).unwrap();
         LogFloat(x0 + Real::ln_1p(n + sum))
