@@ -1,10 +1,12 @@
 extern crate rand;
 extern crate nalgebra as na;
+extern crate num_traits;
 mod v3;
 
 use rand::distributions::{Distribution};
 use std::f64;
 use v3::V3;
+use num_traits::Num;
 
 struct RandomWalk<Rng> {
     rng: Rng,
@@ -86,4 +88,17 @@ fn main() {
 
     let _results: Vec<()> = promises.into_iter().map(await).collect();
     //debug!("Hello {}", steps);
+}
+
+fn mean<N, T>(iter: T) -> N where
+    N: Num + std::convert::From<u32>,
+    T: Iterator<Item=N>
+{
+    use std::convert::From;
+    let (accum, count) = iter.fold((From::from(0 as u32), 0), |(accum, count): (N, u32), x| (accum+x, count+1));
+    accum / From::from(count)
+}
+
+fn correlate(max_tau: usize, tau: usize, vec: Vec<f64>) -> f64 {
+    mean(vec.iter().take(vec.len() - max_tau).zip(vec.iter().skip(tau)).map(|(x,y)| x*y))
 }
