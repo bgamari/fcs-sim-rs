@@ -172,6 +172,7 @@ fn main() {
               .collect();
           //write_vec(std::path::Path::new("out.txt"), &steps).unwrap();
           let padded_steps: Vec<LogFloat<f64>> = pad_to_length(2*max_tau as usize, LogFloat::from_value(0.0), steps);
+          println!("{} trajectory done", i);
           let corrs: Vec<LogFloat<f64>> =
               taus
               .par_iter()
