@@ -37,12 +37,12 @@ impl Distribution<V3<f64>> for OnSphere {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> V3<f64> {
         use std::f64::consts::PI;
         use rand::distributions::Uniform;
-        let phi = rng.sample(Uniform::new(0.0, PI));
-        let theta = rng.sample(Uniform::new(-PI, PI));
+        let theta: f64 = rng.sample(Uniform::new(0.0, 2.0*PI));
+        let phi: f64 = (1.0 as f64 - 2.0 * rng.sample(Uniform::new(0.0, 1.0))).acos();
         V3 {
-            x: theta.sin() * phi.cos(),
-            y: theta.sin() * phi.sin(),
-            z: theta.cos()
+            x: phi.sin() * theta.cos(),
+            y: phi.sin() * theta.sin(),
+            z: phi.cos()
         }
     }
 }

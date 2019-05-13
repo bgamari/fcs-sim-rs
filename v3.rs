@@ -2,6 +2,8 @@ extern crate std;
 
 use std::f64;
 use std::ops;
+use num_traits::{Num, Float};
+use num_traits::real::Real;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct V3<T> {
@@ -13,6 +15,24 @@ pub struct V3<T> {
 impl<T> V3<T> {
     pub fn origin() -> V3<T> where T: Scalar {
         V3 { x: Scalar::zero(), y: Scalar::zero(), z: Scalar::zero() }
+    }
+
+    pub fn quadrance(&self) -> T where
+        T: Num + Copy
+    {
+        self.x * self.x + self.y * self.y + self.z * self.z
+    }
+
+    pub fn norm(&self) -> T where
+        T: Real + Copy
+    {
+        self.quadrance().sqrt()
+    }
+
+    pub fn normalise(&self) -> Self where
+        T: Real + Copy
+    {
+        *self / self.norm()
     }
 }
 
