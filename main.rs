@@ -1,6 +1,7 @@
 extern crate rand;
 extern crate nalgebra as na;
 extern crate num_traits;
+extern crate rayon;
 mod v3;
 
 use rand::distributions::{Distribution};
@@ -48,45 +49,23 @@ fn beam_intensity(beam_size: V3<f64>, p: V3<f64>) -> f64 {
     (-alpha / 2.0).exp()
 }
 
-struct Promise<T>(std::sync::mpsc::Receiver<T>);
-
-fn await<T>(promise: Promise<T>) -> T {
-    let Promise(recv) = promise;
-    recv.recv().unwrap()
-}
-
-fn parallel<T, F>(f: F) -> Promise<T> where
-    T: 'static + Send,
-    F: 'static + Send + Fn () -> T
-{
-    use std::thread;
-    use std::sync::mpsc::channel;
-    let (sender, receiver) = channel();
-    thread::spawn(move || {
-        let x = f();
-        sender.send(x).unwrap();
-    });
-    Promise(receiver)
-}
-
 fn main() {
     use std::vec::Vec;
     use rand::FromEntropy;
+    use rayon::prelude::*;
     let beam_size = V3 {x:1.0, y:1.0, z:10.0};
-    let promises: Vec<Promise<()>> = (0..32).map(|_i| {
-      parallel(move || {
+    let xs: Vec<_> = (0..128).collect();
+    let results: Vec<f64> = xs.par_iter().map(|_i| {
           let rng = rand::rngs::SmallRng::from_entropy();
           let walk = RandomWalk {
               rng: rng, diffusivity: 1.0, pos: V3::origin()
           };
           let steps: Vec<f64> = walk.map(|x| beam_intensity(beam_size, x)).take(10000000).collect();
           //let steps: Vec<V3<f64>> = walk.map(|x| beam_intensity(beam_size, x)).take(10000000).collect();
-          let s: f64 = steps.into_iter().sum();
-          println!("hello {:?}", s);
-      })
+          correlate(100, 32, steps)
     }).collect();
+    println!("hello {:?}", results);
 
-    let _results: Vec<()> = promises.into_iter().map(await).collect();
     //debug!("Hello {}", steps);
 }
 
