@@ -71,17 +71,19 @@ fn main() {
     use std::vec::Vec;
     use rand::FromEntropy;
     let beam_size = V3 {x:1.0, y:1.0, z:10.0};
-    let promise = parallel(move || {
-        let rng = rand::rngs::SmallRng::from_entropy();
-        let walk = RandomWalk {
-            rng: rng, diffusivity: 1.0, pos: V3::origin()
-        };
-        let steps: Vec<f64> = walk.map(|x| beam_intensity(beam_size, x)).take(10000000).collect();
-        //let steps: Vec<V3<f64>> = walk.map(|x| beam_intensity(beam_size, x)).take(10000000).collect();
-        let s: f64 = steps.into_iter().sum();
-        println!("hello {:?}", s);
-    });
+    let promises: Vec<Promise<()>> = (0..32).map(|_i| {
+      parallel(move || {
+          let rng = rand::rngs::SmallRng::from_entropy();
+          let walk = RandomWalk {
+              rng: rng, diffusivity: 1.0, pos: V3::origin()
+          };
+          let steps: Vec<f64> = walk.map(|x| beam_intensity(beam_size, x)).take(10000000).collect();
+          //let steps: Vec<V3<f64>> = walk.map(|x| beam_intensity(beam_size, x)).take(10000000).collect();
+          let s: f64 = steps.into_iter().sum();
+          println!("hello {:?}", s);
+      })
+    }).collect();
 
-    await(promise);
+    let _results: Vec<()> = promises.into_iter().map(await).collect();
     //debug!("Hello {}", steps);
 }
