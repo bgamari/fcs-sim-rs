@@ -183,7 +183,7 @@ fn main() {
           println!("{} done", i);
           let fname = format!("corr-{:04}", i);
           let path = std::path::Path::new(&fname);
-          write_vec(path, tau_ts.iter().zip(&norm_corr(&corrs)));
+          write_vec(path, tau_ts.iter().zip(&corrs));
           corrs
     }).collect();
 }
