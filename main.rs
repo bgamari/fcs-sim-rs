@@ -145,7 +145,7 @@ fn main() {
     let step_t: f64 = 10e-9; // seconds
     //let n_steps: u64 = (100e-3 / step_t) as u64;
     let sample_idxs: Vec<_> = (0..128).collect();
-    let max_tau: f64 = 10e-3;
+    let max_tau: f64 = 10e-3; // seconds
     let n_taus: u64 = 1000;
     let sigma = Real::sqrt(6.0 * diffusivity * step_t / 1e-9);
 
@@ -172,12 +172,12 @@ fn main() {
               // .take(n_steps as usize)
               .collect();
           //write_vec(std::path::Path::new("out.txt"), &steps).unwrap();
-          let padded_steps: Vec<LogFloat<f64>> = pad_to_length(2*max_tau as usize, LogFloat::from_value(0.0), steps);
+          let padded_steps: Vec<LogFloat<f64>> = pad_to_length((2.0 * max_tau / step_t) as usize, LogFloat::from_value(0.0), steps);
           println!("{} trajectory done", i);
           let corrs: Vec<LogFloat<f64>> =
               taus
               .par_iter()
-              .map(|tau| correlate_log(max_tau as usize, *tau, &padded_steps))
+              .map(|tau| correlate_log((max_tau / step_t) as usize, *tau, &padded_steps))
               .collect();
 
           println!("{} done", i);
