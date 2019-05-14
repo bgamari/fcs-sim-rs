@@ -145,7 +145,7 @@ fn main() {
     let step_t: f64 = 10e-9; // seconds
     //let n_steps: u64 = (100e-3 / step_t) as u64;
     let sample_idxs: Vec<_> = (0..128).collect();
-    let max_tau: u64 = (10e-3 / step_t) as u64;
+    let max_tau: f64 = 10e-3;
     let n_taus: u64 = 1000;
     let sigma = Real::sqrt(6.0 * diffusivity * step_t / 1e-9);
 
@@ -153,7 +153,7 @@ fn main() {
     let taus: Vec<usize> =
         tau_ts
         .iter()
-        .map(|x| Real::round(*x) as usize)
+        .map(|tau| Real::round(*tau / step_t) as usize)
         .collect();
     //println!("taus: {:?}\n", tau_ts);
 
