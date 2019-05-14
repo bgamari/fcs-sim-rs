@@ -22,6 +22,11 @@ impl<T: Copy + num_traits::Float> LogFloat<T> {
         *n
     }
 
+    pub fn to_value(&self) -> T {
+        let LogFloat(n) = self;
+        n.exp()
+    }
+
     pub fn sum(v: &Vec<LogFloat<T>>) -> LogFloat<T> where
         T: std::cmp::PartialOrd + Real + std::iter::Sum
     {

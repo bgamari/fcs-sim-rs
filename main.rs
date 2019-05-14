@@ -183,9 +183,15 @@ fn main() {
           println!("{} done", i);
           let fname = format!("corr-{:04}", i);
           let path = std::path::Path::new(&fname);
-          write_vec(path, tau_ts.iter().zip(&corrs));
+          write_vec(path, tau_ts.iter().zip(&norm_corr(&corrs)));
           corrs
     }).collect();
+}
+
+fn norm_corr(corr: &Vec<LogFloat<f64>>) -> Vec<f64>
+{
+    let g0 = corr[0];
+    corr.iter().map(|g| (*g / g0).to_value()).collect()
 }
 
 fn pad_to_length<T: Clone>(length: usize, pad: T, mut vec: Vec<T>) -> Vec<T> {
