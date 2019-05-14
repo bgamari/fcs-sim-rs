@@ -121,14 +121,15 @@ fn log_space(min: f64, max: f64, n: usize) -> Vec<f64> {
     }).collect()
 }
 
-fn write_vec<'a, T>(path: &std::path::Path, v: &'a Vec<T>) -> std::io::Result<()> where
+fn write_vec<T, I>(path: &std::path::Path, mut v: I) -> std::io::Result<()> where
+    I: Iterator<Item=T>,
     T: serde::Serialize
 {
     let mut wtr = csv::WriterBuilder::new()
         .delimiter(b'\t')
         .from_path(path)?;
 
-    v.iter().try_for_each(|x| wtr.serialize(x))?;
+    v.try_for_each(|x| wtr.serialize(x))?;
     Ok(())
 }
 
@@ -140,9 +141,9 @@ fn main() {
 
     let diffusivity = 0.122; // nm^2 / ns
     let beam_size = V3 {x: 200.0, y: 200.0, z: 1000.0}; // nm
-    let sim_box = Box::new(beam_size * 30.0);
+    let sim_box = Box::new(beam_size * 50.0);
     let step_t: f64 = 10e-9; // seconds
-    let n_steps: u64 = (100e-3 / step_t) as u64;
+    //let n_steps: u64 = (100e-3 / step_t) as u64;
     let sample_idxs: Vec<_> = (0..128).collect();
     let max_tau: u64 = (10e-3 / step_t) as u64;
     let n_taus: u64 = 1000;
@@ -156,7 +157,7 @@ fn main() {
         .collect();
     //println!("taus: {:?}\n", tau_ts);
 
-    let results: Vec<Vec<LogFloat<f64>>> = sample_idxs.par_iter().map(move |i| {
+    let results: Vec<Vec<LogFloat<f64>>> = sample_idxs.par_iter().map(|i| {
           let mut rng = rand::rngs::SmallRng::from_entropy();
           let walk = WalkThroughBox {
               sim_box: sim_box,
@@ -178,15 +179,13 @@ fn main() {
               .par_iter()
               .map(|tau| correlate_log(max_tau as usize, *tau, &padded_steps))
               .collect();
+
           println!("{} done", i);
+          let fname = format!("corr-{:04}", i);
+          let path = std::path::Path::new(&fname);
+          write_vec(path, tau_ts.iter().zip(&corrs));
           corrs
     }).collect();
-
-    results.iter().enumerate().try_for_each(|(i, corrs)| {
-        let fname = format!("corr-{}", i);
-        let path = std::path::Path::new(&fname);
-        write_vec(path, corrs)
-    }).unwrap();
 }
 
 fn pad_to_length<T: Clone>(length: usize, pad: T, mut vec: Vec<T>) -> Vec<T> {
